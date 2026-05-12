@@ -6,96 +6,94 @@ import {
 
 export default {
   async fetch(request, env) {
-    if (request.method !== 'POST') {
-      return new Response('Method Not Allowed', { status: 405 });
-    }
+    try {
+      if (request.method !== 'POST') {
+        return new Response('Method Not Allowed', { status: 405 });
+      }
 
-    const signature = request.headers.get('x-signature-ed25519');
-    const timestamp = request.headers.get('x-signature-timestamp');
-    const body = await request.text();
+      const signature = request.headers.get('x-signature-ed25519');
+      const timestamp = request.headers.get('x-signature-timestamp');
+      const body = await request.text();
 
-    if (!signature || !timestamp || !body) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+      if (!signature || !timestamp || !body) {
+        return new Response('Unauthorized', { status: 401 });
+      }
 
-    const isValidRequest = await verifyKey(
-      body,
-      signature,
-      timestamp,
-      env.DISCORD_PUBLIC_KEY ? env.DISCORD_PUBLIC_KEY.trim() : ''
-    );
+      const isValidRequest = await verifyKey(
+        body,
+        signature,
+        timestamp,
+        env.DISCORD_PUBLIC_KEY ? env.DISCORD_PUBLIC_KEY.trim() : ''
+      );
 
-    if (!isValidRequest) {
-      return new Response('Invalid request signature', { status: 401 });
-    }
+      if (!isValidRequest) {
+        return new Response('Invalid request signature', { status: 401 });
+      }
 
-    const interaction = JSON.parse(body);
+      const interaction = JSON.parse(body);
 
-    if (interaction.type === InteractionType.PING) {
-      return new Response(JSON.stringify({ type: InteractionResponseType.PONG }), {
-        headers: { 'content-type': 'application/json' },
+      if (interaction.type === 1) { // PING
+        return new Response(JSON.stringify({ type: 1 }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (interaction.type === 2) { // APPLICATION_COMMAND
+        if (interaction.data.name === 'setup-catalog') {
+          return await handleSetupCatalog(interaction, env);
+        }
+      }
+
+      if (interaction.type === 3) { // MESSAGE_COMPONENT
+        const customId = interaction.data.custom_id;
+        if (customId.startsWith('catalog_prev_') || customId.startsWith('catalog_next_')) {
+          return await handlePagination(interaction, env);
+        }
+        if (customId === 'read_story_btn') {
+          return new Response(JSON.stringify({
+            type: 9, // MODAL
+            data: {
+              custom_id: 'read_story_modal',
+              title: 'Read a Story',
+              components: [{
+                type: 1,
+                components: [{
+                  type: 4,
+                  custom_id: 'story_id_input',
+                  label: 'Enter Story ID Number',
+                  style: 1,
+                  min_length: 1,
+                  placeholder: 'e.g. 1',
+                  required: true,
+                }]
+              }]
+            }
+          }), { headers: { 'content-type': 'application/json' } });
+        }
+      }
+
+      if (interaction.type === 5) { // MODAL_SUBMIT
+        if (interaction.data.custom_id === 'read_story_modal') {
+          const storyId = interaction.data.components[0].components[0].value;
+          return await handleReadStory(storyId, env);
+        }
+      }
+
+      return new Response('Not found', { status: 404 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
       });
     }
-
-    if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-      if (interaction.data.name === 'setup-catalog') {
-        return await handleSetupCatalog(interaction, env);
-      }
-    }
-
-    if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
-      const customId = interaction.data.custom_id;
-      if (customId.startsWith('catalog_')) {
-        return await handlePagination(interaction, env);
-      }
-      if (customId === 'read_story_btn') {
-        return new Response(JSON.stringify({
-          type: InteractionResponseType.MODAL,
-          data: {
-            custom_id: 'read_story_modal',
-            title: 'Read a Story',
-            components: [{
-              type: 1,
-              components: [{
-                type: 4,
-                custom_id: 'story_id_input',
-                label: 'Enter Story ID Number',
-                style: 1,
-                min_length: 1,
-                placeholder: 'e.g. 1',
-                required: true,
-              }]
-            }]
-          }
-        }), { headers: { 'content-type': 'application/json' } });
-      }
-    }
-
-    if (interaction.type === InteractionType.MODAL_SUBMIT) {
-      if (interaction.data.custom_id === 'read_story_modal') {
-        const storyId = interaction.data.components[0].components[0].value;
-        return await handleReadStory(storyId, env);
-      }
-    }
-
-    return new Response('Not found', { status: 404 });
   },
 };
 
 async function handleSetupCatalog(interaction, env) {
   if (!interaction.member) {
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: { content: 'This command can only be used in a server.', flags: 64 },
-    }), { headers: { 'content-type': 'application/json' } });
-  }
-
-  const permissions = BigInt(interaction.member.permissions);
-  const ADMINISTRATOR = 1n << 3n;
-  if (!(permissions & ADMINISTRATOR)) {
-    return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: { content: 'Only administrators can use this command.', flags: 64 },
+      type: 4,
+      data: { content: 'Server only.', flags: 64 }
     }), { headers: { 'content-type': 'application/json' } });
   }
 
@@ -116,22 +114,21 @@ async function handleSetupCatalog(interaction, env) {
     await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?), (?, ?)')
       .bind('catalog_channel_id', channelId, 'catalog_message_id', data.id)
       .run();
-    return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: { content: 'Catalog initialized successfully!', flags: 64 },
-    }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ type: 4, data: { content: 'Catalog set!', flags: 64 } }), {
+      headers: { 'content-type': 'application/json' }
+    });
   }
-  return new Response(JSON.stringify({
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: { content: 'Failed to initialize catalog: ' + JSON.stringify(data), flags: 64 },
-  }), { headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify({ type: 4, data: { content: 'Error: ' + JSON.stringify(data), flags: 64 } }), {
+    headers: { 'content-type': 'application/json' }
+  });
 }
 
 async function handlePagination(interaction, env) {
-  const page = parseInt(interaction.data.custom_id.split('_')[1]);
+  const customId = interaction.data.custom_id;
+  const page = parseInt(customId.split('_').pop());
   const { embed, components } = await createCatalogPage(page, env);
   return new Response(JSON.stringify({
-    type: InteractionResponseType.UPDATE_MESSAGE,
+    type: 7,
     data: { embeds: [embed], components: components }
   }), { headers: { 'content-type': 'application/json' } });
 }
@@ -139,20 +136,18 @@ async function handlePagination(interaction, env) {
 async function handleReadStory(storyId, env) {
   const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
   if (!story) {
-    return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: { content: `Story with ID ${storyId} not found.`, flags: 64 },
-    }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ type: 4, data: { content: 'Not found.', flags: 64 } }), {
+      headers: { 'content-type': 'application/json' }
+    });
   }
   return new Response(JSON.stringify({
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    type: 4,
     data: {
       embeds: [{
         title: story.title,
         author: { name: story.author },
         description: story.content,
-        footer: { text: `ID: ${story.id}` },
-        timestamp: story.created_at
+        footer: { text: `ID: ${story.id}` }
       }],
       flags: 64
     }
@@ -167,40 +162,18 @@ async function createCatalogPage(page, env) {
   const totalRes = await env.DB.prepare('SELECT COUNT(*) as count FROM stories').first();
   const total = totalRes ? totalRes.count : 0;
   const totalPages = Math.ceil(total / pageSize) || 1;
-  const description = (stories && stories.results && stories.results.length > 0)
+  const description = (stories && stories.results && stories.results.length)
     ? stories.results.map(s => `**#${s.id}** - ${s.title} by ${s.author}`).join('\n')
-    : 'No stories found.';
+    : 'No stories.';
 
   return {
-    embed: {
-      title: 'Story Catalog',
-      description: description,
-      color: 0x00ff00,
-      footer: { text: `Page ${page} of ${totalPages}` }
-    },
+    embed: { title: 'Catalog', description, color: 0x00ff00, footer: { text: `Page ${page}/${totalPages}` } },
     components: [{
       type: 1,
       components: [
-        {
-          type: 2,
-          label: 'Previous',
-          style: 1,
-          custom_id: `catalog_${Math.max(1, page - 1)}`,
-          disabled: page <= 1
-        },
-        {
-          type: 2,
-          label: 'Next',
-          style: 1,
-          custom_id: `catalog_${Math.min(totalPages, page + 1)}`,
-          disabled: page >= totalPages
-        },
-        {
-          type: 2,
-          label: 'Read Story',
-          style: 3,
-          custom_id: 'read_story_btn'
-        }
+        { type: 2, label: 'Prev', style: 1, custom_id: `catalog_prev_${Math.max(1, page - 1)}`, disabled: page <= 1 },
+        { type: 2, label: 'Next', style: 1, custom_id: `catalog_next_${Math.min(totalPages, page + 1)}`, disabled: page >= totalPages },
+        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' }
       ]
     }]
   };
