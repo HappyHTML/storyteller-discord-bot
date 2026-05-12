@@ -5,7 +5,7 @@ import {
 } from 'discord-interactions';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
       if (request.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405 });
@@ -100,7 +100,11 @@ export default {
         }
         if (interaction.data.custom_id === 'listen_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
-          return await handleListenStory(interaction, storyId, env);
+          // Defer and handle in background
+          ctx.waitUntil(handleListenStory(interaction, storyId, env));
+          return new Response(JSON.stringify({ type: 5, data: { flags: 64 } }), {
+            headers: { 'content-type': 'application/json' },
+          });
         }
       }
 
@@ -180,18 +184,10 @@ async function handleReadStory(storyId, env) {
 }
 
 async function handleListenStory(interaction, storyId, env) {
-  // 1. Defer response immediately (3s limit)
-  const deferUrl = `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`;
-  await fetch(deferUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 5, data: { flags: 64 } })
-  });
-
   const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`;
 
   try {
-    // 2. Fetch Story
+    // 1. Fetch Story
     const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
     if (!story) {
       await fetch(followUpUrl, {
@@ -202,10 +198,11 @@ async function handleListenStory(interaction, storyId, env) {
       return new Response(null, { status: 204 });
     }
 
-    // 3. Clean Text (Strip ALL Emojis)
-    // Using Unicode property escapes for comprehensive emoji removal
+    // 3. Clean Text (Rid all emoticons, keep punctuation, math, currency)
+    // We keep: Letters, Marks (accents), Numbers, Punctuation, Separators,
+    // Math Symbols, Currency Symbols, and standard whitespace.
     const cleanContent = story.content
-      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Z}\p{Sm}\p{Sc}\s]/gu, '')
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -219,18 +216,16 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     // 4. Generate Audio
-    const response = await env.AI.run('@cf/facebook/mms-tts', {
+    const audioArrayBuffer = await env.AI.run('@cf/facebook/mms-tts', {
       text: cleanContent
     });
-
-    const audioBuffer = await response.arrayBuffer();
 
     // 5. Send as Follow-up with FormData
     const formData = new FormData();
     formData.append('payload_json', JSON.stringify({
       content: `Here is your audio for **${story.title}** by ${story.author}:`
     }));
-    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
+    formData.append('file', new Blob([audioArrayBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
 
     await fetch(followUpUrl, {
       method: 'POST',
@@ -239,14 +234,14 @@ async function handleListenStory(interaction, storyId, env) {
 
   } catch (err) {
     console.error(err);
-    await fetch(followUpUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: 'Failed to generate audio. Please try again later.' })
-    });
+    try {
+      await fetch(followUpUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Failed to generate audio. Please try again later.' })
+      });
+    } catch (e) {}
   }
-
-  return new Response(null, { status: 204 });
 }
 
 async function createCatalogPage(page, env) {
