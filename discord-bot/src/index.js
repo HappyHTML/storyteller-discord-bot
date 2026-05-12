@@ -202,9 +202,12 @@ async function handleListenStory(interaction, storyId, env) {
       return new Response(null, { status: 204 });
     }
 
-    // 3. Clean Text (Strip Emojis)
-    // Most basic way to strip common emojis/special chars for TTS
-    const cleanContent = story.content.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+    // 3. Clean Text (Strip ALL Emojis)
+    // Using Unicode property escapes for comprehensive emoji removal
+    const cleanContent = story.content
+      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     if (cleanContent.length > 4096) {
        await fetch(followUpUrl, {
