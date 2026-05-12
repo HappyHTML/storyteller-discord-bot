@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Storyteller</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #5865F2;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        #loginSection, #adminSection { background: var(--card-bg); padding: 30px; border-radius: 12px; margin-top: 50px; }
+        #adminSection { display: none; margin-top: 20px; }
+        input, textarea { width: 100%; padding: 12px; margin: 10px 0; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .story-card { background: #334155; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #475569; }
+        .controls { margin-top: 15px; display: flex; gap: 10px; }
+        .edit-fields { display: none; margin-top: 15px; border-top: 1px solid #475569; padding-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loginSection">
+            <h2>Admin Login</h2>
+            <input type="password" id="adminPassword" placeholder="Enter Admin Password">
+            <button onclick="login()">Login</button>
+        </div>
+
+        <div id="adminSection">
+            <h1>Admin Dashboard</h1>
+            <div id="storiesList">Loading tales...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentPassword = '';
+
+        async function login() {
+            const pw = document.getElementById('adminPassword').value;
+            const res = await fetch('/api/admin/stories', {
+                headers: { 'Authorization': pw }
+            });
+            if (res.ok) {
+                currentPassword = pw;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('adminSection').style.display = 'block';
+                loadStories();
+            } else {
+                alert('Invalid Password');
+            }
+        }
+
+        async function loadStories() {
+            const res = await fetch('/api/admin/stories', {
+                headers: { 'Authorization': currentPassword }
+            });
+            const stories = await res.json();
+            const list = document.getElementById('storiesList');
+            list.innerHTML = stories.map(s => `
+                <div class="story-card" id="story-${s.id}">
+                    <h3>#${s.id}: ${s.title}</h3>
+                    <p><strong>Author:</strong> ${s.author}</p>
+                    <p>${s.content.substring(0, 100)}...</p>
+                    <div class="controls">
+                        <button onclick="toggleEdit(${s.id})">Edit</button>
+                    </div>
+                    <div class="edit-fields" id="edit-${s.id}">
+                        <input type="text" id="title-${s.id}" value="${s.title}">
+                        <input type="text" id="author-${s.id}" value="${s.author}">
+                        <textarea id="content-${s.id}">${s.content}</textarea>
+                        <button onclick="saveEdit(${s.id})">Save Changes</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleEdit(id) {
+            const el = document.getElementById(`edit-${id}`);
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+
+        async function saveEdit(id) {
+            const data = {
+                id: id,
+                title: document.getElementById(`title-${id}`).value,
+                author: document.getElementById(`author-${id}`).value,
+                content: document.getElementById(`content-${id}`).value
+            };
+            const res = await fetch('/api/admin/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': currentPassword
+                },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                alert('Story updated!');
+                loadStories();
+            } else {
+                alert('Failed to update.');
+            }
+        }
+    </script>
+</body>
+</html>
