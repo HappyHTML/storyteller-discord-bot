@@ -199,12 +199,19 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     // 3. Clean Text (Rid all emoticons, keep punctuation, math, currency)
-    // We keep: Letters, Marks (accents), Numbers, Punctuation, Separators,
-    // Math Symbols, Currency Symbols, and standard whitespace.
     const cleanContent = story.content
       .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Z}\p{Sm}\p{Sc}\s]/gu, '')
       .replace(/\s+/g, ' ')
       .trim();
+
+    if (!cleanContent) {
+      await fetch(followUpUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'The story content is empty or contains only emoticons, so there is nothing to narrate!' })
+      });
+      return;
+    }
 
     if (cleanContent.length > 4096) {
        await fetch(followUpUrl, {
@@ -216,16 +223,23 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     // 4. Generate Audio
-    const audioArrayBuffer = await env.AI.run('@cf/facebook/mms-tts', {
+    if (!env.AI) {
+      throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
+    }
+
+    const aiResponse = await env.AI.run('@cf/facebook/mms-tts', {
       text: cleanContent
     });
+
+    // Handle both Buffer and Uint8Array outputs
+    const audioData = aiResponse instanceof Response ? await aiResponse.arrayBuffer() : aiResponse;
 
     // 5. Send as Follow-up with FormData
     const formData = new FormData();
     formData.append('payload_json', JSON.stringify({
       content: `Here is your audio for **${story.title}** by ${story.author}:`
     }));
-    formData.append('file', new Blob([audioArrayBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
+    formData.append('file', new Blob([audioData], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
 
     await fetch(followUpUrl, {
       method: 'POST',
@@ -238,7 +252,7 @@ async function handleListenStory(interaction, storyId, env) {
       await fetch(followUpUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'Failed to generate audio. Please try again later.' })
+        body: JSON.stringify({ content: `Failed to generate audio: ${err.message}` })
       });
     } catch (e) {}
   }
