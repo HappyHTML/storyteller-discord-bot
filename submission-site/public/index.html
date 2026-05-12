@@ -3,33 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit a Story</title>
+    <title>Storyteller - Submit Your Legend</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
-        form { display: flex; flex-direction: column; gap: 1rem; }
-        input, textarea { padding: 0.5rem; font-size: 1rem; }
-        textarea { height: 200px; }
-        button { padding: 0.75rem; font-size: 1rem; background-color: #5865F2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #4752C4; }
-        #message { margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none; }
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
+        :root {
+            --primary: #5865F2;
+            --primary-hover: #4752C4;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #fbbf24;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #fff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        form {
+            display: grid;
+            gap: 24px;
+        }
+
+        .input-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input, textarea {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 0 4px rgba(88, 101, 242, 0.2);
+        }
+
+        textarea {
+            min-height: 250px;
+            resize: vertical;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #message {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 12px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #4ade80;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #f87171;
+        }
+
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Submit Your Story</h1>
-    <form id="storyForm">
-        <input type="text" id="title" placeholder="Title" required>
-        <input type="text" id="author" placeholder="Author" required>
-        <textarea id="content" placeholder="Story Content" required></textarea>
-        <button type="submit">Submit Story</button>
-    </form>
-    <div id="message"></div>
+    <div class="container">
+        <header>
+            <h1>Storyteller</h1>
+            <p class="subtitle">Immortalize your legends in the digital halls.</p>
+        </header>
+
+        <form id="storyForm">
+            <div class="input-group">
+                <label for="title">Tale Title</label>
+                <input type="text" id="title" placeholder="What is this story called?" required>
+            </div>
+
+            <div class="input-group">
+                <label for="author">The Bard</label>
+                <input type="text" id="author" placeholder="Who tells this tale?" required>
+            </div>
+
+            <div class="input-group">
+                <label for="content">The Narrative</label>
+                <textarea id="content" placeholder="Once upon a time..." required></textarea>
+            </div>
+
+            <button type="submit">Submit to the Chronicles</button>
+        </form>
+
+        <div id="message"></div>
+
+        <footer>
+            &copy; 2024 Storyteller Chronicles. Powered by Cloudflare D1.
+        </footer>
+    </div>
 
     <script>
         document.getElementById('storyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const btn = e.target.querySelector('button');
             const messageDiv = document.getElementById('message');
+
+            btn.disabled = true;
+            btn.textContent = 'Recording Tale...';
             messageDiv.style.display = 'none';
 
             const data = {
@@ -54,9 +241,12 @@
                     document.getElementById('storyForm').reset();
                 }
             } catch (err) {
-                messageDiv.textContent = 'An error occurred. Please try again.';
+                messageDiv.textContent = 'The chronicles are currently closed. Try again later.';
                 messageDiv.style.display = 'block';
                 messageDiv.className = 'error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Submit to the Chronicles';
             }
         });
     </script>
