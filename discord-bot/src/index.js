@@ -227,7 +227,7 @@ async function handleListenStory(interaction, storyId, env) {
       throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
     }
 
-    const aiResponse = await env.AI.run('@cf/facebook/mms-tts', {
+    const aiResponse = await env.AI.run('@cf/myshell-ai/melotts', {
       text: cleanContent
     });
 
