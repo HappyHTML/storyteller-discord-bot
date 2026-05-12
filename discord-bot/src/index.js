@@ -184,21 +184,21 @@ async function handleReadStory(storyId, env) {
 }
 
 async function handleListenStory(interaction, storyId, env) {
-  const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`;
+  const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`;
 
   try {
     // 1. Fetch Story
     const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
     if (!story) {
       await fetch(followUpUrl, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'Story not found.' })
       });
-      return new Response(null, { status: 204 });
+      return;
     }
 
-    // 3. Clean Text (Rid all emoticons, keep punctuation, math, currency)
+    // 2. Clean Text (Rid all emoticons, keep punctuation, math, currency)
     const cleanContent = story.content
       .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Z}\p{Sm}\p{Sc}\s]/gu, '')
       .replace(/\s+/g, ' ')
@@ -206,7 +206,7 @@ async function handleListenStory(interaction, storyId, env) {
 
     if (!cleanContent) {
       await fetch(followUpUrl, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'The story content is empty or contains only emoticons, so there is nothing to narrate!' })
       });
@@ -215,34 +215,46 @@ async function handleListenStory(interaction, storyId, env) {
 
     if (cleanContent.length > 4096) {
        await fetch(followUpUrl, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'This story is too long for my voice! Please use the Read button instead.' })
       });
-      return new Response(null, { status: 204 });
+      return;
     }
 
-    // 4. Generate Audio
+    // 3. Generate Audio
     if (!env.AI) {
       throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
     }
 
     const aiResponse = await env.AI.run('@cf/myshell-ai/melotts', {
-      text: cleanContent
+      prompt: cleanContent
     });
 
-    // Handle both Buffer and Uint8Array outputs
-    const audioData = aiResponse instanceof Response ? await aiResponse.arrayBuffer() : aiResponse;
+    let audioBuffer;
+    if (aiResponse instanceof Response) {
+      audioBuffer = await aiResponse.arrayBuffer();
+    } else if (aiResponse.audio) {
+      // Handle base64 output if returned as JSON
+      const binaryString = atob(aiResponse.audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      audioBuffer = bytes.buffer;
+    } else {
+      audioBuffer = aiResponse; // Assume it's already a buffer/uint8array
+    }
 
-    // 5. Send as Follow-up with FormData
+    // 4. Send as Follow-up with FormData (PATCH original message)
     const formData = new FormData();
     formData.append('payload_json', JSON.stringify({
       content: `Here is your audio for **${story.title}** by ${story.author}:`
     }));
-    formData.append('file', new Blob([audioData], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
+    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
 
     await fetch(followUpUrl, {
-      method: 'POST',
+      method: 'PATCH',
       body: formData
     });
 
@@ -250,7 +262,7 @@ async function handleListenStory(interaction, storyId, env) {
     console.error(err);
     try {
       await fetch(followUpUrl, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: `Failed to generate audio: ${err.message}` })
       });
