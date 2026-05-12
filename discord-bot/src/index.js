@@ -22,7 +22,9 @@ export default {
       return new Response('Internal Configuration Error', { status: 500 });
     }
 
-    const isValidRequest = verifyKey(
+    // THE FIX: Many versions of this library in Worker environments return a Promise.
+    // We MUST await it to get the actual true/false result.
+    const isValidRequest = await verifyKey(
       body,
       signature,
       timestamp,
@@ -32,6 +34,7 @@ export default {
     console.log('Is Signature Valid?', isValidRequest);
 
     if (!isValidRequest) {
+      console.log('Verification FAILED. Check your DISCORD_PUBLIC_KEY.');
       return new Response('Invalid request signature', { status: 401 });
     }
 
