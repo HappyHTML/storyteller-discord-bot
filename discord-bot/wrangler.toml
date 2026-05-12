@@ -7,6 +7,9 @@ binding = "DB"
 database_name = "stories-db"
 database_id = "7e357ef5-5cac-40b7-946c-8a62aca673f7"
 
+[ai]
+binding = "AI"
+
 [vars]
 # DISCORD_APPLICATION_ID = ""
 # DISCORD_PUBLIC_KEY = ""

@@ -70,12 +70,37 @@ export default {
             }
           }), { headers: { 'content-type': 'application/json' } });
         }
+        if (customId === 'listen_story_btn') {
+          return new Response(JSON.stringify({
+            type: 9, // MODAL
+            data: {
+              custom_id: 'listen_story_modal',
+              title: 'Listen to a Story',
+              components: [{
+                type: 1,
+                components: [{
+                  type: 4,
+                  custom_id: 'story_id_input',
+                  label: 'Enter Story ID Number',
+                  style: 1,
+                  min_length: 1,
+                  placeholder: 'e.g. 1',
+                  required: true,
+                }]
+              }]
+            }
+          }), { headers: { 'content-type': 'application/json' } });
+        }
       }
 
       if (interaction.type === 5) { // MODAL_SUBMIT
         if (interaction.data.custom_id === 'read_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
           return await handleReadStory(storyId, env);
+        }
+        if (interaction.data.custom_id === 'listen_story_modal') {
+          const storyId = interaction.data.components[0].components[0].value;
+          return await handleListenStory(interaction, storyId, env);
         }
       }
 
@@ -154,6 +179,73 @@ async function handleReadStory(storyId, env) {
   }), { headers: { 'content-type': 'application/json' } });
 }
 
+async function handleListenStory(interaction, storyId, env) {
+  // 1. Defer response immediately (3s limit)
+  const deferUrl = `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`;
+  await fetch(deferUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 5, data: { flags: 64 } })
+  });
+
+  const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`;
+
+  try {
+    // 2. Fetch Story
+    const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
+    if (!story) {
+      await fetch(followUpUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Story not found.' })
+      });
+      return new Response(null, { status: 204 });
+    }
+
+    // 3. Clean Text (Strip Emojis)
+    // Most basic way to strip common emojis/special chars for TTS
+    const cleanContent = story.content.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+
+    if (cleanContent.length > 4096) {
+       await fetch(followUpUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'This story is too long for my voice! Please use the Read button instead.' })
+      });
+      return new Response(null, { status: 204 });
+    }
+
+    // 4. Generate Audio
+    const response = await env.AI.run('@cf/facebook/mms-tts', {
+      text: cleanContent
+    });
+
+    const audioBuffer = await response.arrayBuffer();
+
+    // 5. Send as Follow-up with FormData
+    const formData = new FormData();
+    formData.append('payload_json', JSON.stringify({
+      content: `Here is your audio for **${story.title}** by ${story.author}:`
+    }));
+    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
+
+    await fetch(followUpUrl, {
+      method: 'POST',
+      body: formData
+    });
+
+  } catch (err) {
+    console.error(err);
+    await fetch(followUpUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Failed to generate audio. Please try again later.' })
+    });
+  }
+
+  return new Response(null, { status: 204 });
+}
+
 async function createCatalogPage(page, env) {
   const pageSize = 10;
   const offset = (page - 1) * pageSize;
@@ -173,7 +265,8 @@ async function createCatalogPage(page, env) {
       components: [
         { type: 2, label: 'Prev', style: 1, custom_id: `catalog_prev_${Math.max(1, page - 1)}`, disabled: page <= 1 },
         { type: 2, label: 'Next', style: 1, custom_id: `catalog_next_${Math.min(totalPages, page + 1)}`, disabled: page >= totalPages },
-        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' }
+        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' },
+        { type: 2, label: 'Listen', style: 3, custom_id: 'listen_story_btn' }
       ]
     }]
   };

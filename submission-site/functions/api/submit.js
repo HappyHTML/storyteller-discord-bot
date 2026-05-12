@@ -73,7 +73,8 @@ async function createCatalogPage(page, env) {
       components: [
         { type: 2, label: 'Prev', style: 1, custom_id: `catalog_prev_${Math.max(1, page - 1)}`, disabled: page <= 1 },
         { type: 2, label: 'Next', style: 1, custom_id: `catalog_next_${Math.min(totalPages, page + 1)}`, disabled: page >= totalPages },
-        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' }
+        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' },
+        { type: 2, label: 'Listen', style: 3, custom_id: 'listen_story_btn' }
       ]
     }]
   };
