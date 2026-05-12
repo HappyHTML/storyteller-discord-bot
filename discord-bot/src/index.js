@@ -33,26 +33,27 @@ export default {
 
       const interaction = JSON.parse(body);
 
-      if (interaction.type === InteractionType.PING) {
+      // 1 is PING
+      if (interaction.type === 1) {
         return new Response(JSON.stringify({ type: 1 }), {
           headers: { 'content-type': 'application/json' },
         });
       }
 
-      if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+      if (interaction.type === 2) { // APPLICATION_COMMAND
         if (interaction.data.name === 'setup-catalog') {
           return await handleSetupCatalog(interaction, env);
         }
       }
 
-      if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+      if (interaction.type === 3) { // MESSAGE_COMPONENT
         const customId = interaction.data.custom_id;
         if (customId.startsWith('catalog_')) {
           return await handlePagination(interaction, env);
         }
         if (customId === 'read_story_btn') {
           return new Response(JSON.stringify({
-            type: InteractionResponseType.MODAL,
+            type: 9, // MODAL
             data: {
               custom_id: 'read_story_modal',
               title: 'Read a Story',
@@ -77,7 +78,7 @@ export default {
         }
       }
 
-      if (interaction.type === InteractionType.MODAL_SUBMIT) {
+      if (interaction.type === 5) { // MODAL_SUBMIT
         if (interaction.data.custom_id === 'read_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
           return await handleReadStory(storyId, env);
@@ -87,7 +88,10 @@ export default {
       return new Response('Not found', { status: 404 });
     } catch (err) {
       console.error(err);
-      return new Response(err.toString(), { status: 500 });
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      });
     }
   },
 };
@@ -95,7 +99,7 @@ export default {
 async function handleSetupCatalog(interaction, env) {
   if (!interaction.member) {
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      type: 4,
       data: { content: 'This command can only be used in a server.', flags: 64 },
     }), { headers: { 'content-type': 'application/json' } });
   }
@@ -104,7 +108,7 @@ async function handleSetupCatalog(interaction, env) {
   const ADMINISTRATOR = 1n << 3n;
   if (!(permissions & ADMINISTRATOR)) {
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      type: 4,
       data: { content: 'Only administrators can use this command.', flags: 64 },
     }), { headers: { 'content-type': 'application/json' } });
   }
@@ -131,12 +135,12 @@ async function handleSetupCatalog(interaction, env) {
       .run();
 
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      type: 4,
       data: { content: 'Catalog initialized successfully!', flags: 64 },
     }), { headers: { 'content-type': 'application/json' } });
   } else {
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      type: 4,
       data: { content: 'Failed to initialize catalog: ' + JSON.stringify(msgData), flags: 64 },
     }), { headers: { 'content-type': 'application/json' } });
   }
@@ -148,7 +152,7 @@ async function handlePagination(interaction, env) {
   const { embed, components } = await createCatalogPage(page, env);
 
   return new Response(JSON.stringify({
-    type: InteractionResponseType.UPDATE_MESSAGE,
+    type: 7, // UPDATE_MESSAGE
     data: {
       embeds: [embed],
       components: components
@@ -163,13 +167,13 @@ async function handleReadStory(storyId, env) {
 
   if (!story) {
     return new Response(JSON.stringify({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      type: 4,
       data: { content: `Story with ID ${storyId} not found.`, flags: 64 },
     }), { headers: { 'content-type': 'application/json' } });
   }
 
   return new Response(JSON.stringify({
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    type: 4,
     data: {
       embeds: [{
         title: story.title,
