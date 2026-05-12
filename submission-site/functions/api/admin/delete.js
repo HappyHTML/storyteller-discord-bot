@@ -6,17 +6,17 @@ export async function onRequestPost(context) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { id, title, author, content } = await request.json();
+  const { id } = await request.json();
 
-  if (!id || !title || !author || !content) {
-    return new Response('Missing fields', { status: 400 });
+  if (!id) {
+    return new Response('Missing ID', { status: 400 });
   }
 
-  await env.DB.prepare('UPDATE stories SET title = ?, author = ?, content = ? WHERE id = ?')
-    .bind(title, author, content, id)
+  await env.DB.prepare('DELETE FROM stories WHERE id = ?')
+    .bind(id)
     .run();
 
-  // Update Discord Catalog immediately after edit
+  // Update Discord Catalog
   const configResults = await env.DB.prepare('SELECT key, value FROM config WHERE key IN (?, ?)')
     .bind('catalog_channel_id', 'catalog_message_id')
     .all();

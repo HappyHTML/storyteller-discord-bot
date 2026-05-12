@@ -27,15 +27,6 @@ export async function onRequestPost(context) {
     });
 
     if (config.catalog_channel_id && config.catalog_message_id) {
-      // 3. Update Discord Catalog
-      // Since we want to update the catalog immediately, we'll fetch the first page or current page.
-      // For simplicity, let's refresh to page 1 as per user request "or the first page".
-
-      // We need the createCatalogPage logic here too.
-      // Instead of duplicating, we could have a shared utility or just fetch it from the bot worker if it was an internal API,
-      // but for Cloudflare Pages Functions, we'll just implement the logic here or import it if possible.
-      // Since they are separate deployments usually, I'll re-implement the fetch logic.
-
       const { embed, components } = await createCatalogPage(1, env);
 
       await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
@@ -66,52 +57,24 @@ export async function onRequestPost(context) {
 async function createCatalogPage(page, env) {
   const pageSize = 10;
   const offset = (page - 1) * pageSize;
-
   const stories = await env.DB.prepare('SELECT id, title, author FROM stories ORDER BY id DESC LIMIT ? OFFSET ?')
-    .bind(pageSize, offset)
-    .all();
-
-  const totalStories = await env.DB.prepare('SELECT COUNT(*) as count FROM stories').first('count');
-  const totalPages = Math.ceil(totalStories / pageSize) || 1;
-
-  let description = stories.results.length > 0
+    .bind(pageSize, offset).all();
+  const totalRes = await env.DB.prepare('SELECT COUNT(*) as count FROM stories').first();
+  const total = totalRes ? totalRes.count : 0;
+  const totalPages = Math.ceil(total / pageSize) || 1;
+  const description = (stories && stories.results && stories.results.length)
     ? stories.results.map(s => `**#${s.id}** - ${s.title} by ${s.author}`).join('\n')
-    : 'No stories found.';
+    : 'No stories.';
 
-  const embed = {
-    title: 'Story Catalog',
-    description: description,
-    color: 0x00ff00,
-    footer: { text: `Page ${page} of ${totalPages}` }
-  };
-
-  const components = [
-    {
+  return {
+    embed: { title: 'Catalog', description, color: 0x00ff00, footer: { text: `Page ${page}/${totalPages}` } },
+    components: [{
       type: 1,
       components: [
-        {
-          type: 2,
-          label: 'Previous',
-          style: 1,
-          custom_id: `catalog_${Math.max(1, page - 1)}`,
-          disabled: page <= 1
-        },
-        {
-          type: 2,
-          label: 'Next',
-          style: 1,
-          custom_id: `catalog_${Math.min(totalPages, page + 1)}`,
-          disabled: page >= totalPages
-        },
-        {
-          type: 2,
-          label: 'Read Story',
-          style: 3,
-          custom_id: 'read_story_btn'
-        }
+        { type: 2, label: 'Prev', style: 1, custom_id: `catalog_prev_${Math.max(1, page - 1)}`, disabled: page <= 1 },
+        { type: 2, label: 'Next', style: 1, custom_id: `catalog_next_${Math.min(totalPages, page + 1)}`, disabled: page >= totalPages },
+        { type: 2, label: 'Read', style: 3, custom_id: 'read_story_btn' }
       ]
-    }
-  ];
-
-  return { embed, components };
+    }]
+  };
 }
