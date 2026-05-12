@@ -9,214 +9,310 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #5865F2;
-            --primary-hover: #4752C4;
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            --card-bg: rgba(255, 255, 255, 0.05);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #020617;
+            --card-bg: rgba(15, 23, 42, 0.7);
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
             --accent: #fbbf24;
+            --gold-glow: 0 0 20px rgba(251, 191, 36, 0.3);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='%23fbbf24'><path d='M19 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM5 4h14v16H5V4zm2 2h10v2H7V6zm0 4h10v2H7v-2zm0 4h7v2H7v-2z'/></svg>") 16 16, auto;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background: var(--bg-gradient);
-            background-attachment: fixed;
+            background: var(--bg-color);
             color: var(--text-main);
-            line-height: 1.6;
+            overflow-x: hidden;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+        }
+
+        /* Interactive Particle Background */
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
         }
 
         .container {
-            width: 100%;
-            max-width: 800px;
+            width: 90%;
+            max-width: 850px;
             background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 40px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 32px;
+            padding: 50px;
+            position: relative;
+            z-index: 10;
+            box-shadow: var(--gold-glow);
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 50px;
         }
 
         h1 {
             font-family: 'Playfair Display', serif;
-            font-size: 3rem;
+            font-size: 4rem;
             font-weight: 800;
-            margin-bottom: 10px;
-            background: linear-gradient(to right, #fff, var(--accent));
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+            background: linear-gradient(to bottom, #fff 30%, var(--accent) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.4));
         }
 
-        p.subtitle {
+        .subtitle {
             color: var(--text-dim);
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         form {
             display: grid;
-            gap: 24px;
+            gap: 30px;
         }
 
         .input-group {
-            display: grid;
-            gap: 8px;
+            position: relative;
         }
 
         label {
-            font-size: 0.9rem;
-            font-weight: 600;
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
             color: var(--accent);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            transition: 0.3s;
         }
 
         input, textarea {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 16px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
             color: white;
             font-family: inherit;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            font-size: 1.1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         input:focus, textarea:focus {
             outline: none;
-            border-color: var(--primary);
-            background: rgba(0, 0, 0, 0.4);
-            box-shadow: 0 0 0 4px rgba(88, 101, 242, 0.2);
+            border-color: var(--accent);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 30px rgba(251, 191, 36, 0.15);
+            transform: scale(1.01);
         }
 
         textarea {
-            min-height: 250px;
-            resize: vertical;
+            min-height: 280px;
+            line-height: 1.7;
         }
 
         button {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
             color: white;
             border: none;
-            border-radius: 12px;
-            padding: 18px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.3s;
+            border-radius: 16px;
+            padding: 22px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 10px 20px -10px var(--primary);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             margin-top: 10px;
         }
 
         button:hover {
-            background: var(--primary-hover);
-            transform: translateY(-2px);
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 30px -10px var(--primary);
+            filter: brightness(1.1);
         }
 
         button:active {
-            transform: translateY(0);
+            transform: translateY(0) scale(0.98);
         }
 
         #message {
-            margin-top: 24px;
-            padding: 16px;
-            border-radius: 12px;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 16px;
             display: none;
             text-align: center;
-            font-weight: 500;
-            animation: slideUp 0.4s ease-out;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .success {
-            background: rgba(34, 197, 94, 0.2);
-            border: 1px solid rgba(34, 197, 94, 0.4);
-            color: #4ade80;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid #10b981;
+            color: #34d399;
         }
 
         .error {
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #ef4444;
             color: #f87171;
         }
 
         footer {
-            margin-top: 40px;
+            margin-top: 50px;
             text-align: center;
             color: var(--text-dim);
-            font-size: 0.8rem;
+            font-size: 0.9rem;
+            font-weight: 300;
+            letter-spacing: 1px;
         }
 
         @media (max-width: 640px) {
-            .container {
-                padding: 24px;
-            }
-            h1 {
-                font-size: 2rem;
-            }
+            .container { padding: 30px; border-radius: 0; width: 100%; }
+            h1 { font-size: 2.5rem; }
         }
     </style>
 </head>
 <body>
+    <canvas id="canvas"></canvas>
+
     <div class="container">
         <header>
             <h1>Storyteller</h1>
-            <p class="subtitle">Immortalize your legends in the digital halls.</p>
+            <p class="subtitle">Whisper your legend to the void</p>
         </header>
 
         <form id="storyForm">
             <div class="input-group">
-                <label for="title">Tale Title</label>
-                <input type="text" id="title" placeholder="What is this story called?" required>
+                <label for="title">The Inscription</label>
+                <input type="text" id="title" placeholder="A Title Worthy of Memory..." required>
             </div>
 
             <div class="input-group">
-                <label for="author">The Bard</label>
-                <input type="text" id="author" placeholder="Who tells this tale?" required>
+                <label for="author">The Chronicler</label>
+                <input type="text" id="author" placeholder="By whose hand?" required>
             </div>
 
             <div class="input-group">
-                <label for="content">The Narrative</label>
-                <textarea id="content" placeholder="Once upon a time..." required></textarea>
+                <label for="content">The Narrative Arc</label>
+                <textarea id="content" placeholder="Let the ink flow..." required></textarea>
             </div>
 
-            <button type="submit">Submit to the Chronicles</button>
+            <button type="submit">Etch into Eternity</button>
         </form>
 
         <div id="message"></div>
 
         <footer>
-            &copy; 2024 Storyteller Chronicles. Powered by Cloudflare D1.
+            Chronicles managed by the D1 Archivists &bull; Est. MMXXIV
         </footer>
     </div>
 
     <script>
+        // Particle Background Logic
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        const mouse = { x: null, y: null };
+
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x > canvas.width) this.x = 0;
+                else if (this.x < 0) this.x = canvas.width;
+                if (this.y > canvas.height) this.y = 0;
+                else if (this.y < 0) this.y = canvas.height;
+
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < 100) {
+                    this.x -= dx / 50;
+                    this.y -= dy / 50;
+                }
+            }
+            draw() {
+                ctx.fillStyle = 'rgba(251, 191, 36, ' + (Math.random() * 0.3 + 0.1) + ')';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            for (let i = 0; i < 150; i++) particles.push(new Particle());
+        }
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+        init();
+        animate();
+
+        // Form Logic
         document.getElementById('storyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
             const messageDiv = document.getElementById('message');
 
             btn.disabled = true;
-            btn.textContent = 'Recording Tale...';
+            btn.textContent = 'Etching...';
             messageDiv.style.display = 'none';
 
             const data = {
@@ -239,14 +335,16 @@
 
                 if (response.ok) {
                     document.getElementById('storyForm').reset();
+                    // Explosion effect on success
+                    for(let i=0; i<50; i++) particles.push(new Particle());
                 }
             } catch (err) {
-                messageDiv.textContent = 'The chronicles are currently closed. Try again later.';
+                messageDiv.textContent = 'The scrolls are lost to time. Try again.';
                 messageDiv.style.display = 'block';
                 messageDiv.className = 'error';
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Submit to the Chronicles';
+                btn.textContent = 'Etch into Eternity';
             }
         });
     </script>
