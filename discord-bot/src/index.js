@@ -10,20 +10,29 @@ export default {
     if (request.method === 'POST') {
       const signature = request.headers.get('x-signature-ed25519');
       const timestamp = request.headers.get('x-signature-timestamp');
-      const body = await request.arrayBuffer();
+
+      if (!signature || !timestamp) {
+        return new Response('Missing signature headers', { status: 401 });
+      }
+
+      const body = await request.text();
       const isValidRequest = verifyKey(
         body,
         signature,
         timestamp,
         env.DISCORD_PUBLIC_KEY
       );
+
       if (!isValidRequest) {
+        console.error('Invalid request signature');
         return new Response('Bad request signature.', { status: 401 });
       }
 
-      const interaction = JSON.parse(new TextDecoder().decode(body));
+      const interaction = JSON.parse(body);
+      console.log('Received Interaction Type:', interaction.type);
 
       if (interaction.type === InteractionType.PING) {
+        console.log('Responding to PING with PONG');
         return new Response(JSON.stringify({ type: InteractionResponseType.PONG }), {
           headers: { 'content-type': 'application/json' },
         });
