@@ -213,11 +213,11 @@ async function handleListenStory(interaction, storyId, env) {
       return;
     }
 
-    if (cleanContent.length > 4096) {
+    if (cleanContent.length > 2000) {
        await fetch(followUpUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'This story is too long for my voice! Please use the Read button instead.' })
+        body: JSON.stringify({ content: 'This story is too long for my voice (max 2,000 characters)! Please use the Read button instead.' })
       });
       return;
     }
