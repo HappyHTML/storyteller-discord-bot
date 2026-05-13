@@ -87,6 +87,7 @@
         .theme-embers { background: #ff4d4d; }
         .theme-forest { background: #2ecc71; }
         .theme-midnight { background: #9b59b6; }
+        .theme-nova { background: #e67e22; }
 
         .container {
             width: 90%;
@@ -140,10 +141,11 @@
 <body>
     <a href="admin.html" class="admin-link">Admin Dashboard</a>
     <div class="theme-selector">
-        <div class="theme-btn theme-stardust" id="btn-stardust" onclick="setTheme('stardust')" title="Stardust (Constellation)"></div>
+        <div class="theme-btn theme-stardust" id="btn-stardust" onclick="setTheme('stardust')" title="Stardust (Original)"></div>
         <div class="theme-btn theme-embers" id="btn-embers" onclick="setTheme('embers')" title="Embers (Floating)"></div>
         <div class="theme-btn theme-forest" id="btn-forest" onclick="setTheme('forest')" title="Forest (Rising)"></div>
         <div class="theme-btn theme-midnight" id="btn-midnight" onclick="setTheme('midnight')" title="Midnight (Rain)"></div>
+        <div class="theme-btn theme-nova" id="btn-nova" onclick="setTheme('nova')" title="Nova (Magnetic)"></div>
     </div>
     <canvas id="canvas"></canvas>
 
@@ -183,10 +185,11 @@
 
         // 2. Constants and State
         const themes = {
-            stardust: { primary: '#5865F2', bg: '#020617', style: 'constellation' },
+            stardust: { primary: '#5865F2', bg: '#020617', style: 'floating' },
             embers: { primary: '#ff4d4d', bg: '#1a0505', style: 'floating' },
             forest: { primary: '#2ecc71', bg: '#051a0e', style: 'rising' },
-            midnight: { primary: '#9b59b6', bg: '#0f051a', style: 'rain' }
+            midnight: { primary: '#9b59b6', bg: '#0f051a', style: 'rain' },
+            nova: { primary: '#e67e22', bg: '#1a0f05', style: 'magnetic' }
         };
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -194,30 +197,31 @@
         let particles = [];
         let currentTheme = localStorage.getItem('story-theme') || 'stardust';
 
-        // 3. Classes (DECLARED BEFORE USE)
+        // 3. Classes
         class Particle {
             constructor() {
                 this.init();
             }
             init() {
-                const theme = themes[currentTheme];
+                const theme = themes[currentTheme] || themes.stardust;
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
                 this.size = Math.random() * 3 + 1;
 
-                if (theme.style === 'constellation') {
-                    this.speedX = Math.random() * 1 - 0.5;
-                    this.speedY = Math.random() * 1 - 0.5;
-                } else if (theme.style === 'rising') {
+                if (theme.style === 'rising') {
                     this.speedX = Math.random() * 0.5 - 0.25;
                     this.speedY = -Math.random() * 1 - 0.5;
                 } else if (theme.style === 'rain') {
                     this.speedX = 0;
                     this.speedY = Math.random() * 5 + 2;
                     this.size = Math.random() * 1 + 1;
-                } else { // embers
+                } else if (theme.style === 'magnetic') {
                     this.speedX = Math.random() * 2 - 1;
                     this.speedY = Math.random() * 2 - 1;
+                    this.size = Math.random() * 4 + 2;
+                } else { // floating
+                    this.speedX = Math.random() * 1 - 0.5;
+                    this.speedY = Math.random() * 1 - 0.5;
                 }
 
                 this.rgb = this.hexToRgb(theme.primary);
@@ -235,7 +239,7 @@
                 this.x += this.speedX;
                 this.y += this.speedY;
 
-                const theme = themes[currentTheme];
+                const theme = themes[currentTheme] || themes.stardust;
                 if (theme.style === 'rain') {
                     if (this.y > canvas.height) { this.y = -10; this.x = Math.random() * canvas.width; }
                 } else if (theme.style === 'rising') {
@@ -247,13 +251,14 @@
                     else if (this.y < 0) this.y = canvas.height;
                 }
 
+                // Interactive Mouse behavior
                 const dx = mouse.x - this.x;
                 const dy = mouse.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 if (distance < 150) {
-                    if (theme.style === 'constellation') {
-                        this.x -= dx / 20;
-                        this.y -= dy / 20;
+                    if (theme.style === 'magnetic') {
+                        this.x += dx / 15;
+                        this.y += dy / 15;
                     } else {
                         this.x += dx / 50;
                         this.y += dy / 50;
@@ -268,10 +273,11 @@
             }
         }
 
-        // 4. Helper Functions (DECLARED BEFORE USE)
+        // 4. Helper Functions
         function init() {
             particles = [];
-            const count = (themes[currentTheme] && themes[currentTheme].style === 'rain') ? 100 : 150;
+            const theme = themes[currentTheme] || themes.stardust;
+            const count = (theme.style === 'rain') ? 100 : 150;
             for (let i = 0; i < count; i++) particles.push(new Particle());
         }
 
@@ -297,31 +303,10 @@
 
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const theme = themes[currentTheme];
-
             particles.forEach(p => {
                 p.update();
                 p.draw();
             });
-
-            if (theme && theme.style === 'constellation') {
-                for (let i = 0; i < particles.length; i++) {
-                    for (let j = i; j < particles.length; j++) {
-                        const dx = particles[i].x - particles[j].x;
-                        const dy = particles[i].y - particles[j].y;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        if (dist < 100) {
-                            const rgb = particles[i].rgb;
-                            ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${1 - dist/100})`;
-                            ctx.lineWidth = 1;
-                            ctx.beginPath();
-                            ctx.moveTo(particles[i].x, particles[i].y);
-                            ctx.lineTo(particles[j].x, particles[j].y);
-                            ctx.stroke();
-                        }
-                    }
-                }
-            }
             requestAnimationFrame(animate);
         }
 
@@ -331,7 +316,7 @@
             init();
         }
 
-        // 5. Setup & Initialization (CALLED AFTER DECLARATIONS)
+        // 5. Setup & Initialization
         window.addEventListener('mousemove', e => { mouse.x = e.x; mouse.y = e.y; });
         window.addEventListener('resize', resize);
 

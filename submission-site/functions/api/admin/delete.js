@@ -12,9 +12,11 @@ export async function onRequestPost(context) {
     return new Response('Missing ID', { status: 400 });
   }
 
-  await env.DB.prepare('DELETE FROM stories WHERE id = ?')
-    .bind(id)
-    .run();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(id),
+    env.DB.prepare('UPDATE stories SET id = id - 1 WHERE id > ?').bind(id),
+    env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COALESCE(MAX(id), 0) FROM stories) WHERE name = 'stories'")
+  ]);
 
   // Update Discord Catalog
   const configResults = await env.DB.prepare('SELECT key, value FROM config WHERE key IN (?, ?)')
