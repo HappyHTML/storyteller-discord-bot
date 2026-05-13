@@ -57,6 +57,15 @@
             }
         }
 
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         async function loadStories() {
             const res = await fetch('/api/admin/stories', {
                 headers: { 'Authorization': currentPassword }
@@ -65,17 +74,17 @@
             const list = document.getElementById('storiesList');
             list.innerHTML = stories.map(s => `
                 <div class="story-card" id="story-${s.id}">
-                    <h3>#${s.id}: ${s.title}</h3>
-                    <p><strong>Author:</strong> ${s.author}</p>
-                    <p>${s.content.substring(0, 100)}...</p>
+                    <h3>#${s.id}: ${escapeHtml(s.title)}</h3>
+                    <p><strong>Author:</strong> ${escapeHtml(s.author)}</p>
+                    <p>${escapeHtml(s.content.substring(0, 100))}...</p>
                     <div class="controls">
                         <button onclick="toggleEdit(${s.id})">Edit</button>
                         <button style="background: #ef4444;" onclick="deleteStory(${s.id})">Delete</button>
                     </div>
                     <div class="edit-fields" id="edit-${s.id}">
-                        <input type="text" id="title-${s.id}" value="${s.title}">
-                        <input type="text" id="author-${s.id}" value="${s.author}">
-                        <textarea id="content-${s.id}">${s.content}</textarea>
+                        <input type="text" id="title-${s.id}" value="${escapeHtml(s.title)}">
+                        <input type="text" id="author-${s.id}" value="${escapeHtml(s.author)}">
+                        <textarea id="content-${s.id}">${escapeHtml(s.content)}</textarea>
                         <button onclick="saveEdit(${s.id})">Save Changes</button>
                     </div>
                 </div>

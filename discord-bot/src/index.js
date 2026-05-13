@@ -227,24 +227,14 @@ async function handleListenStory(interaction, storyId, env) {
       throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
     }
 
-    const aiResponse = await env.AI.run('@cf/myshell-ai/melotts', {
-      prompt: cleanContent
+    const aiResponse = await env.AI.run('@cf/deepgram/aura-1', {
+      text: cleanContent,
+      speaker: 'orion'
+    }, {
+      returnRawResponse: true
     });
 
-    let audioBuffer;
-    if (aiResponse instanceof Response) {
-      audioBuffer = await aiResponse.arrayBuffer();
-    } else if (aiResponse.audio) {
-      // Handle base64 output if returned as JSON
-      const binaryString = atob(aiResponse.audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      audioBuffer = bytes.buffer;
-    } else {
-      audioBuffer = aiResponse; // Assume it's already a buffer/uint8array
-    }
+    const audioBuffer = await aiResponse.arrayBuffer();
 
     // 4. Send as Follow-up with FormData (PATCH original message)
     const formData = new FormData();
