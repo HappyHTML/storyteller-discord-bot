@@ -324,27 +324,11 @@
             document.documentElement.style.setProperty('--primary', hex);
             // Update UI buttons
             document.querySelectorAll('.color-btn').forEach(b => {
-                const bg = b.style.background;
-                // Simple check for hex match
-                b.classList.toggle('active', b.title.toLowerCase().includes(nameFromHex(hex)));
-            });
-
-            // Re-apply active class based on exact hex if possible
-            document.querySelectorAll('.color-btn').forEach(b => {
                 const btnHex = rgbToHex(b.style.backgroundColor);
                 b.classList.toggle('active', btnHex.toLowerCase() === hex.toLowerCase());
             });
 
             init();
-        }
-
-        function nameFromHex(hex) {
-            if (hex === '#5865F2') return 'discord';
-            if (hex === '#ff4d4d') return 'embers';
-            if (hex === '#2ecc71') return 'forest';
-            if (hex === '#9b59b6') return 'midnight';
-            if (hex === '#e67e22') return 'nova';
-            return '';
         }
 
         function rgbToHex(rgb) {
@@ -366,9 +350,9 @@
                     const dx = particles[i].x - particles[j].x;
                     const dy = particles[i].y - particles[j].y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance < 100) {
-                        ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.2 * (1 - distance / 100)})`;
-                        ctx.lineWidth = 1;
+                    if (distance < 150) {
+                        ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.8 * (1 - distance / 150)})`;
+                        ctx.lineWidth = 2;
                         ctx.beginPath();
                         ctx.moveTo(particles[i].x, particles[i].y);
                         ctx.lineTo(particles[j].x, particles[j].y);

@@ -12,10 +12,13 @@ export async function onRequestPost(context) {
     return new Response('Missing ID', { status: 400 });
   }
 
+  // Delete and then re-index ALL stories to ensure no gaps
   await env.DB.batch([
     env.DB.prepare('DELETE FROM stories WHERE id = ?').bind(id),
-    env.DB.prepare('UPDATE stories SET id = id - 1 WHERE id > ?').bind(id),
-    env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COALESCE(MAX(id), 0) FROM stories) WHERE name = 'stories'")
+    // Re-index logic: temporarily move IDs to a high range then back to 1..N
+    env.DB.prepare('UPDATE stories SET id = id + 1000000'),
+    env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM stories s2 WHERE s2.id <= stories.id)'),
+    env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COUNT(*) FROM stories) WHERE name = 'stories'")
   ]);
 
   // Update Discord Catalog

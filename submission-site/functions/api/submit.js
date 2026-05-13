@@ -31,12 +31,20 @@ export async function onRequestPost(context) {
       throw new Error('Database binding not found. Please check your Pages settings.');
     }
 
-    // 1. Insert into D1
-    console.log('Inserting into D1...');
-    await env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)')
-      .bind(title, author, content)
-      .run();
-    console.log('Insert successful');
+    // 1. Insert into D1 and ensure no gaps
+    console.log('Re-indexing and inserting into D1...');
+    await env.DB.batch([
+      // Re-index existing to close any gaps
+      env.DB.prepare('UPDATE stories SET id = id + 1000000'),
+      env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM stories s2 WHERE s2.id <= stories.id)'),
+      // Insert new story
+      env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)').bind(title, author, content),
+      // Final re-index to ensure the new one is also correctly numbered and seq is reset
+      env.DB.prepare('UPDATE stories SET id = id + 1000000'),
+      env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM stories s2 WHERE s2.id <= stories.id)'),
+      env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COUNT(*) FROM stories) WHERE name = 'stories'")
+    ]);
+    console.log('Insert and re-index successful');
 
     // 2. Get Catalog Config
     const configResults = await env.DB.prepare('SELECT key, value FROM config WHERE key IN (?, ?)')
