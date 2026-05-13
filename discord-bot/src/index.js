@@ -229,10 +229,16 @@ async function handleListenStory(interaction, storyId, env) {
 
     const aiResponse = await env.AI.run('@cf/deepgram/aura-1', {
       text: cleanContent,
-      speaker: 'orion'
+      speaker: 'orion',
+      encoding: 'mp3'
     }, {
       returnRawResponse: true
     });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      throw new Error(`AI Service Error: ${aiResponse.status} - ${errorText}`);
+    }
 
     const audioBuffer = await aiResponse.arrayBuffer();
 
