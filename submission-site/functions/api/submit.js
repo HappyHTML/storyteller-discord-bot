@@ -11,6 +11,13 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (content.length > 4000) {
+      return new Response(JSON.stringify({ error: 'Story content must be 4000 characters or less.' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     // 1. Insert into D1
     await env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)')
       .bind(title, author, content)

@@ -12,6 +12,10 @@ export async function onRequestPost(context) {
     return new Response('Missing fields', { status: 400 });
   }
 
+  if (content.length > 4000) {
+    return new Response('Story content must be 4000 characters or less.', { status: 400 });
+  }
+
   await env.DB.prepare('UPDATE stories SET title = ?, author = ?, content = ? WHERE id = ?')
     .bind(title, author, content, id)
     .run();

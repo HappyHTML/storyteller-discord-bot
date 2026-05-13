@@ -228,9 +228,21 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     const chunks = [];
-    const chunkSize = 1500; // Smaller than 2000 to be safe
-    for (let i = 0; i < cleanContent.length; i += chunkSize) {
-      chunks.push(cleanContent.substring(i, i + chunkSize));
+    const chunkSize = 1500; // Aim for 1500 chars
+    let remaining = cleanContent;
+
+    while (remaining.length > 0) {
+      if (remaining.length <= chunkSize) {
+        chunks.push(remaining);
+        break;
+      }
+
+      // Find the last space within the chunk size
+      let index = remaining.lastIndexOf(' ', chunkSize);
+      if (index === -1) index = chunkSize; // No space found, fallback to hard cut
+
+      chunks.push(remaining.substring(0, index).trim());
+      remaining = remaining.substring(index).trim();
     }
 
     const audioParts = [];
