@@ -228,7 +228,7 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     const chunks = [];
-    const chunkSize = 1500; // Aim for 1500 chars
+    const chunkSize = 1900; // Aim for 1900 chars
     let remaining = cleanContent;
 
     while (remaining.length > 0) {

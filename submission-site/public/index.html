@@ -21,6 +21,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='%23ffffff'><path d='M19 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM5 4h14v16H5V4zm2 2h10v2H7V6zm0 4h10v2H7v-2zm0 4h7v2H7v-2z'/></svg>") 16 16, auto;
         }
 
         body {
@@ -174,50 +175,26 @@
     </div>
 
     <script>
+        // 1. Error Handling (Global)
         window.onerror = function(msg, url, line) {
             alert("Frontend Error: " + msg + "\nAt: " + url + ":" + line);
             return false;
         };
 
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
-        const mouse = { x: null, y: null };
-
+        // 2. Constants and State
         const themes = {
             stardust: { primary: '#5865F2', bg: '#020617', style: 'constellation' },
             embers: { primary: '#ff4d4d', bg: '#1a0505', style: 'floating' },
             forest: { primary: '#2ecc71', bg: '#051a0e', style: 'rising' },
             midnight: { primary: '#9b59b6', bg: '#0f051a', style: 'rain' }
         };
-
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const mouse = { x: null, y: null };
+        let particles = [];
         let currentTheme = localStorage.getItem('story-theme') || 'stardust';
 
-        function setTheme(name) {
-            if (!themes[name]) name = 'stardust';
-            currentTheme = name;
-            localStorage.setItem('story-theme', name);
-            const theme = themes[name];
-
-            try {
-                document.documentElement.style.setProperty('--primary', theme.primary);
-                document.documentElement.style.setProperty('--bg-color', theme.bg);
-
-                document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-                const btn = document.getElementById(`btn-${name}`);
-                if (btn) btn.classList.add('active');
-
-                init();
-            } catch (e) {
-                console.error('Theme switch error:', e);
-            }
-        }
-
-        window.addEventListener('mousemove', e => { mouse.x = e.x; mouse.y = e.y; });
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); }
-        window.addEventListener('resize', resize);
-        resize();
-
+        // 3. Classes (DECLARED BEFORE USE)
         class Particle {
             constructor() {
                 this.init();
@@ -259,7 +236,6 @@
                 this.y += this.speedY;
 
                 const theme = themes[currentTheme];
-
                 if (theme.style === 'rain') {
                     if (this.y > canvas.height) { this.y = -10; this.x = Math.random() * canvas.width; }
                 } else if (theme.style === 'rising') {
@@ -271,7 +247,6 @@
                     else if (this.y < 0) this.y = canvas.height;
                 }
 
-                // Interactive Mouse behavior
                 const dx = mouse.x - this.x;
                 const dy = mouse.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -293,10 +268,31 @@
             }
         }
 
+        // 4. Helper Functions (DECLARED BEFORE USE)
         function init() {
             particles = [];
-            const count = themes[currentTheme].style === 'rain' ? 100 : 150;
+            const count = (themes[currentTheme] && themes[currentTheme].style === 'rain') ? 100 : 150;
             for (let i = 0; i < count; i++) particles.push(new Particle());
+        }
+
+        function setTheme(name) {
+            if (!themes[name]) name = 'stardust';
+            currentTheme = name;
+            localStorage.setItem('story-theme', name);
+            const theme = themes[name];
+
+            try {
+                document.documentElement.style.setProperty('--primary', theme.primary);
+                document.documentElement.style.setProperty('--bg-color', theme.bg);
+
+                document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                const btn = document.getElementById(`btn-${name}`);
+                if (btn) btn.classList.add('active');
+
+                init();
+            } catch (e) {
+                console.error('Theme switch error:', e);
+            }
         }
 
         function animate() {
@@ -308,9 +304,7 @@
                 p.draw();
             });
 
-            // Draw lines for constellation style
-            if (theme.style === 'constellation') {
-                // Simpler constellation: just draw lines between close points
+            if (theme && theme.style === 'constellation') {
                 for (let i = 0; i < particles.length; i++) {
                     for (let j = i; j < particles.length; j++) {
                         const dx = particles[i].x - particles[j].x;
@@ -331,9 +325,21 @@
             requestAnimationFrame(animate);
         }
 
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            init();
+        }
+
+        // 5. Setup & Initialization (CALLED AFTER DECLARATIONS)
+        window.addEventListener('mousemove', e => { mouse.x = e.x; mouse.y = e.y; });
+        window.addEventListener('resize', resize);
+
+        resize();
         setTheme(currentTheme);
         animate();
 
+        // Form logic
         document.getElementById('storyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');

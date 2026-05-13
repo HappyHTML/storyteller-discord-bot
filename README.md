@@ -37,9 +37,12 @@ npx wrangler d1 execute stories-db --file=schema.sql
 
 ## 3. Submission Website Setup
 1. Deploy the `submission-site` folder to Cloudflare Pages.
-2. In the Pages settings, bind the same D1 database (`DB`) to your project.
-3. Set the `DISCORD_TOKEN` environment variable in the Pages dashboard.
-4. Deploy:
+2. In the Pages settings (**Settings > Functions > Variable bindings**), add the following:
+   - **D1 database binding**: Name it `DB` and select your `stories-db`.
+   - **Environment variables**:
+     - `DISCORD_TOKEN`: Your Discord Bot Token.
+     - `ADMIN_PASSWORD`: A secure password for your dashboard.
+3. Deploy:
    ```bash
    cd submission-site
    npx wrangler pages deploy public
