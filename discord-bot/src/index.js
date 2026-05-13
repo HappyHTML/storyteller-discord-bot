@@ -213,34 +213,53 @@ async function handleListenStory(interaction, storyId, env) {
       return;
     }
 
-    if (cleanContent.length > 2000) {
+    if (cleanContent.length > 20000) {
        await fetch(followUpUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'This story is too long for my voice (max 2,000 characters)! Please use the Read button instead.' })
+        body: JSON.stringify({ content: 'This story is exceptionally long (over 20,000 characters)! Please use the Read button instead.' })
       });
       return;
     }
 
-    // 3. Generate Audio
+    // 3. Generate Audio (Chunked to handle limits)
     if (!env.AI) {
       throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
     }
 
-    const aiResponse = await env.AI.run('@cf/deepgram/aura-1', {
-      text: cleanContent,
-      speaker: 'orion',
-      encoding: 'mp3'
-    }, {
-      returnRawResponse: true
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      throw new Error(`AI Service Error: ${aiResponse.status} - ${errorText}`);
+    const chunks = [];
+    const chunkSize = 1500; // Smaller than 2000 to be safe
+    for (let i = 0; i < cleanContent.length; i += chunkSize) {
+      chunks.push(cleanContent.substring(i, i + chunkSize));
     }
 
-    const audioBuffer = await aiResponse.arrayBuffer();
+    const audioParts = [];
+    for (const chunk of chunks) {
+      const aiResponse = await env.AI.run('@cf/deepgram/aura-1', {
+        text: chunk,
+        speaker: 'orion',
+        encoding: 'mp3'
+      }, {
+        returnRawResponse: true
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        throw new Error(`AI Service Error: ${aiResponse.status} - ${errorText}`);
+      }
+
+      const part = await aiResponse.arrayBuffer();
+      audioParts.push(new Uint8Array(part));
+    }
+
+    // Concatenate all audio parts
+    const totalLength = audioParts.reduce((acc, val) => acc + val.length, 0);
+    const audioBuffer = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const part of audioParts) {
+      audioBuffer.set(part, offset);
+      offset += part.length;
+    }
 
     // 4. Send as Follow-up with FormData (PATCH original message)
     const formData = new FormData();
