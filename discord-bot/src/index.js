@@ -247,7 +247,7 @@ async function handleListenStory(interaction, storyId, env) {
 
     const audioParts = [];
     for (const chunk of chunks) {
-      const aiResponse = await env.AI.run('@cf/deepgram/aura-1', {
+      const aiResponse = await env.AI.run('@cf/deepgram/aura-2-en', {
         text: chunk,
         speaker: 'orion',
         encoding: 'mp3'
