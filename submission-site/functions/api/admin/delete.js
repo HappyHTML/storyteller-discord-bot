@@ -2,7 +2,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const auth = request.headers.get('Authorization');
 
-  if (auth !== env.ADMIN_PASSWORD) {
+  if (!auth || auth.trim() !== (env.ADMIN_PASSWORD || "").trim()) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -25,15 +25,22 @@ export async function onRequestPost(context) {
   configResults.results.forEach(row => { config[row.key] = row.value; });
 
   if (config.catalog_channel_id && config.catalog_message_id) {
-    const { embed, components } = await createCatalogPage(1, env);
-    await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bot ${env.DISCORD_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ embeds: [embed], components: components })
-    });
+    const updatePromise = (async () => {
+      try {
+        const { embed, components } = await createCatalogPage(1, env);
+        await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bot ${env.DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ embeds: [embed], components: components })
+        });
+      } catch (e) {
+        console.error('Discord update error:', e);
+      }
+    })();
+    if (context.waitUntil) context.waitUntil(updatePromise);
   }
 
   return new Response(JSON.stringify({ success: true }), {

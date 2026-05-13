@@ -11,6 +11,13 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (title.length > 100 || author.length > 100) {
+      return new Response(JSON.stringify({ error: 'Title and Author must be 100 characters or less.' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     if (content.length > 4000) {
       return new Response(JSON.stringify({ error: 'Story content must be 4000 characters or less.' }), {
         status: 400,
@@ -34,19 +41,28 @@ export async function onRequestPost(context) {
     });
 
     if (config.catalog_channel_id && config.catalog_message_id) {
-      const { embed, components } = await createCatalogPage(1, env);
+      const updatePromise = (async () => {
+        try {
+          const { embed, components } = await createCatalogPage(1, env);
+          await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bot ${env.DISCORD_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              embeds: [embed],
+              components: components
+            })
+          });
+        } catch (discordErr) {
+          console.error('Discord update failed:', discordErr);
+        }
+      })();
 
-      await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bot ${env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          embeds: [embed],
-          components: components
-        })
-      });
+      if (context.waitUntil) {
+        context.waitUntil(updatePromise);
+      }
     }
 
     return new Response(JSON.stringify({ message: 'Story submitted successfully and catalog updated!' }), {

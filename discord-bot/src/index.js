@@ -245,24 +245,24 @@ async function handleListenStory(interaction, storyId, env) {
       remaining = remaining.substring(index).trim();
     }
 
-    const audioParts = [];
-    for (const chunk of chunks) {
-      const aiResponse = await env.AI.run('@cf/deepgram/aura-2-en', {
+    const audioPromises = chunks.map(chunk =>
+      env.AI.run('@cf/deepgram/aura-2-en', {
         text: chunk,
         speaker: 'orion',
         encoding: 'mp3'
       }, {
         returnRawResponse: true
-      });
+      }).then(async res => {
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`AI Service Error: ${res.status} - ${errorText}`);
+        }
+        return res.arrayBuffer();
+      })
+    );
 
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        throw new Error(`AI Service Error: ${aiResponse.status} - ${errorText}`);
-      }
-
-      const part = await aiResponse.arrayBuffer();
-      audioParts.push(new Uint8Array(part));
-    }
+    const audioBuffers = await Promise.all(audioPromises);
+    const audioParts = audioBuffers.map(part => new Uint8Array(part));
 
     // Concatenate all audio parts
     const totalLength = audioParts.reduce((acc, val) => acc + val.length, 0);

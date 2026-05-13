@@ -2,7 +2,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const auth = request.headers.get('Authorization');
 
-  if (auth !== env.ADMIN_PASSWORD) {
+  if (!auth || auth.trim() !== (env.ADMIN_PASSWORD || "").trim()) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -12,8 +12,18 @@ export async function onRequestPost(context) {
     return new Response('Missing fields', { status: 400 });
   }
 
+  if (title.length > 100 || author.length > 100) {
+    return new Response(JSON.stringify({ error: 'Title and Author must be 100 characters or less.' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
   if (content.length > 4000) {
-    return new Response('Story content must be 4000 characters or less.', { status: 400 });
+    return new Response(JSON.stringify({ error: 'Story content must be 4000 characters or less.' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' }
+    });
   }
 
   await env.DB.prepare('UPDATE stories SET title = ?, author = ?, content = ? WHERE id = ?')
@@ -29,15 +39,22 @@ export async function onRequestPost(context) {
   configResults.results.forEach(row => { config[row.key] = row.value; });
 
   if (config.catalog_channel_id && config.catalog_message_id) {
-    const { embed, components } = await createCatalogPage(1, env);
-    await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bot ${env.DISCORD_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ embeds: [embed], components: components })
-    });
+    const updatePromise = (async () => {
+      try {
+        const { embed, components } = await createCatalogPage(1, env);
+        await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bot ${env.DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ embeds: [embed], components: components })
+        });
+      } catch (e) {
+        console.error('Discord update error:', e);
+      }
+    })();
+    if (context.waitUntil) context.waitUntil(updatePromise);
   }
 
   return new Response(JSON.stringify({ success: true }), {

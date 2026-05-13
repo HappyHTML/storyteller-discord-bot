@@ -2,7 +2,7 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const auth = request.headers.get('Authorization');
 
-  if (auth !== env.ADMIN_PASSWORD) {
+  if (!auth || auth.trim() !== (env.ADMIN_PASSWORD || "").trim()) {
     return new Response('Unauthorized', { status: 401 });
   }
 
