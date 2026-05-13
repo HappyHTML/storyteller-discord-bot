@@ -1,5 +1,6 @@
 export async function onRequestPost(context) {
   const { request, env } = context;
+  console.log('Submit API called');
 
   try {
     const { title, author, content } = await request.json();
@@ -25,10 +26,17 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (!env.DB) {
+      console.error('D1 DB binding missing');
+      throw new Error('Database binding not found. Please check your Pages settings.');
+    }
+
     // 1. Insert into D1
+    console.log('Inserting into D1...');
     await env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)')
       .bind(title, author, content)
       .run();
+    console.log('Insert successful');
 
     // 2. Get Catalog Config
     const configResults = await env.DB.prepare('SELECT key, value FROM config WHERE key IN (?, ?)')
@@ -41,10 +49,12 @@ export async function onRequestPost(context) {
     });
 
     if (config.catalog_channel_id && config.catalog_message_id) {
+      console.log('Found Discord catalog config, triggering background update...');
       const updatePromise = (async () => {
         try {
           const { embed, components } = await createCatalogPage(1, env);
-          await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
+          console.log(`Patching Discord message ${config.catalog_message_id} in channel ${config.catalog_channel_id}`);
+          const dRes = await fetch(`https://discord.com/api/v10/channels/${config.catalog_channel_id}/messages/${config.catalog_message_id}`, {
             method: 'PATCH',
             headers: {
               'Authorization': `Bot ${env.DISCORD_TOKEN}`,
@@ -55,6 +65,8 @@ export async function onRequestPost(context) {
               components: components
             })
           });
+          console.log(`Discord PATCH response: ${dRes.status}`);
+          if (!dRes.ok) console.error(await dRes.text());
         } catch (discordErr) {
           console.error('Discord update failed:', discordErr);
         }
@@ -70,6 +82,7 @@ export async function onRequestPost(context) {
       headers: { 'content-type': 'application/json' },
     });
   } catch (err) {
+    console.error('Submit API error:', err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { 'content-type': 'application/json' },

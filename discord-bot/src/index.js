@@ -278,12 +278,18 @@ async function handleListenStory(interaction, storyId, env) {
     formData.append('payload_json', JSON.stringify({
       content: `Here is your audio for **${story.title}** by ${story.author}:`
     }));
-    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/\s+/g, '_')}.mp3`);
+    // Use files[0] for attachment name in payload if needed, but Discord usually picks it up from the field name or filename
+    formData.append('files[0]', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/[^\w.-]/g, '_')}.mp3`);
 
-    await fetch(followUpUrl, {
+    const res = await fetch(followUpUrl, {
       method: 'PATCH',
       body: formData
     });
+
+    if (!res.ok) {
+        const text = await res.text();
+        console.error('Discord PATCH error:', text);
+    }
 
   } catch (err) {
     console.error(err);
