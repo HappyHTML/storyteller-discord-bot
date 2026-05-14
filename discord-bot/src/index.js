@@ -96,7 +96,6 @@ export default {
       if (interaction.type === 5) { // MODAL_SUBMIT
         if (interaction.data.custom_id === 'read_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
-          // For potentially multi-message responses, we defer
           ctx.waitUntil(handleReadStory(interaction, storyId, env));
           return new Response(JSON.stringify({ type: 5, data: { flags: 64 } }), {
             headers: { 'content-type': 'application/json' },
@@ -179,11 +178,9 @@ async function handleReadStory(interaction, storyId, env) {
       return;
     }
 
-    // Split logic for unlimited character stories
     const embeds = [];
     const maxEmbedSize = 4000;
     let remaining = story.content;
-    let partNum = 1;
 
     while (remaining.length > 0) {
       let chunk;
@@ -198,15 +195,17 @@ async function handleReadStory(interaction, storyId, env) {
       }
 
       embeds.push({
-        title: partNum === 1 ? story.title : `${story.title} (Part ${partNum})`,
-        author: partNum === 1 ? { name: story.author } : undefined,
-        description: chunk,
-        footer: { text: `ID: ${story.id} | Part ${partNum}` }
+        description: chunk
       });
-      partNum++;
     }
 
-    // Group embeds into messages (max 6000 chars total and max 10 embeds per message)
+    // Apply header/footer only to the bounds
+    if (embeds.length > 0) {
+      embeds[0].title = story.title;
+      embeds[0].author = { name: story.author };
+      embeds[embeds.length - 1].footer = { text: `ID: ${story.id}` };
+    }
+
     const messages = [];
     let currentBatch = [];
     let currentTotalLength = 0;
@@ -222,14 +221,12 @@ async function handleReadStory(interaction, storyId, env) {
     }
     if (currentBatch.length > 0) messages.push(currentBatch);
 
-    // Send the first batch as @original PATCH
     await fetch(`${followUpUrl}/messages/@original`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ embeds: messages[0] })
     });
 
-    // Send remaining batches as separate follow-up POSTs
     for (let i = 1; i < messages.length; i++) {
       await fetch(followUpUrl, {
         method: 'POST',
@@ -276,8 +273,6 @@ async function handleListenStory(interaction, storyId, env) {
       return;
     }
 
-    // 1000 character chunks to stay within subrequest limits (max 50)
-    // for 50,000 char stories.
     const chunks = [];
     const maxChunkSize = 1000;
     let remaining = cleanContent;
@@ -293,8 +288,9 @@ async function handleListenStory(interaction, storyId, env) {
       remaining = remaining.substring(index).trim();
     }
 
+    // Using the StreamElements direct proxy for best reliability and avoiding 401s
     const audioPromises = chunks.map(chunk =>
-      fetch(`https://api.streamelements.com/kappa/v2/speech?voice=Matthew&text=${encodeURIComponent(chunk)}`)
+      fetch(`https://api.streamelements.com/static/saas/proxy/tts?voice=Matthew&text=${encodeURIComponent(chunk)}`)
         .then(res => {
           if (!res.ok) throw new Error(`TTS Error: ${res.status}`);
           return res.arrayBuffer();
