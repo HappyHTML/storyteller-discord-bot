@@ -420,7 +420,7 @@
                     <div class="edit-fields" id="edit-${s.id}">
                         <input type="text" id="title-${s.id}" value="${escapeHtml(s.title)}">
                         <input type="text" id="author-${s.id}" value="${escapeHtml(s.author)}">
-                        <textarea id="content-${s.id}" maxlength="4000">${escapeHtml(s.content)}</textarea>
+                        <textarea id="content-${s.id}" maxlength="50000">${escapeHtml(s.content)}</textarea>
                         <button onclick="saveEdit(${s.id})">Save Changes</button>
                     </div>
                 </div>

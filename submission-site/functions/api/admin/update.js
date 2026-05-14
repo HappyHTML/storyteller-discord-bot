@@ -19,8 +19,9 @@ export async function onRequestPost(context) {
     });
   }
 
-  if (content.length > 4000) {
-    return new Response(JSON.stringify({ error: 'Story content must be 4000 characters or less.' }), {
+  // Increased limit to 50,000
+  if (content.length > 50000) {
+    return new Response(JSON.stringify({ error: 'Story content must be 50,000 characters or less.' }), {
       status: 400,
       headers: { 'content-type': 'application/json' }
     });

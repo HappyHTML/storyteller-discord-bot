@@ -19,8 +19,9 @@ export async function onRequestPost(context) {
       });
     }
 
-    if (content.length > 4000) {
-      return new Response(JSON.stringify({ error: 'Story content must be 4000 characters or less.' }), {
+    // Increased limit to 50,000 characters
+    if (content.length > 50000) {
+      return new Response(JSON.stringify({ error: 'Story content must be 50,000 characters or less.' }), {
         status: 400,
         headers: { 'content-type': 'application/json' },
       });
@@ -32,12 +33,9 @@ export async function onRequestPost(context) {
     }
 
     // 1. Insert into D1 and ensure no gaps
-    // We order by original ID to maintain the existing sequence during re-index
     console.log('Re-indexing and inserting into D1...');
     await env.DB.batch([
-      // First, insert the new story (it will get the next AUTOINCREMENT ID temporarily)
       env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)').bind(title, author, content),
-      // Now re-index ALL stories to close any gaps and ensure 1..N
       env.DB.prepare('UPDATE stories SET id = id + 1000000'),
       env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM (SELECT id FROM stories ORDER BY id ASC) AS s2 WHERE s2.id <= stories.id)'),
       env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COUNT(*) FROM stories) WHERE name = 'stories'")

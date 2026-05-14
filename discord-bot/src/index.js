@@ -96,11 +96,14 @@ export default {
       if (interaction.type === 5) { // MODAL_SUBMIT
         if (interaction.data.custom_id === 'read_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
-          return await handleReadStory(storyId, env);
+          // For potentially multi-message responses, we defer
+          ctx.waitUntil(handleReadStory(interaction, storyId, env));
+          return new Response(JSON.stringify({ type: 5, data: { flags: 64 } }), {
+            headers: { 'content-type': 'application/json' },
+          });
         }
         if (interaction.data.custom_id === 'listen_story_modal') {
           const storyId = interaction.data.components[0].components[0].value;
-          // Defer and handle in background
           ctx.waitUntil(handleListenStory(interaction, storyId, env));
           return new Response(JSON.stringify({ type: 5, data: { flags: 64 } }), {
             headers: { 'content-type': 'application/json' },
@@ -162,32 +165,93 @@ async function handlePagination(interaction, env) {
   }), { headers: { 'content-type': 'application/json' } });
 }
 
-async function handleReadStory(storyId, env) {
-  const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
-  if (!story) {
-    return new Response(JSON.stringify({ type: 4, data: { content: 'Not found.', flags: 64 } }), {
-      headers: { 'content-type': 'application/json' }
+async function handleReadStory(interaction, storyId, env) {
+  const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`;
+
+  try {
+    const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
+    if (!story) {
+      await fetch(`${followUpUrl}/messages/@original`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Story not found.' })
+      });
+      return;
+    }
+
+    // Split logic for unlimited character stories
+    const embeds = [];
+    const maxEmbedSize = 4000;
+    let remaining = story.content;
+    let partNum = 1;
+
+    while (remaining.length > 0) {
+      let chunk;
+      if (remaining.length <= maxEmbedSize) {
+        chunk = remaining;
+        remaining = '';
+      } else {
+        let index = remaining.lastIndexOf(' ', maxEmbedSize);
+        if (index === -1) index = maxEmbedSize;
+        chunk = remaining.substring(0, index).trim();
+        remaining = remaining.substring(index).trim();
+      }
+
+      embeds.push({
+        title: partNum === 1 ? story.title : `${story.title} (Part ${partNum})`,
+        author: partNum === 1 ? { name: story.author } : undefined,
+        description: chunk,
+        footer: { text: `ID: ${story.id} | Part ${partNum}` }
+      });
+      partNum++;
+    }
+
+    // Group embeds into messages (max 6000 chars total and max 10 embeds per message)
+    const messages = [];
+    let currentBatch = [];
+    let currentTotalLength = 0;
+
+    for (const embed of embeds) {
+      if (currentBatch.length >= 10 || (currentTotalLength + embed.description.length) > 5800) {
+        messages.push(currentBatch);
+        currentBatch = [];
+        currentTotalLength = 0;
+      }
+      currentBatch.push(embed);
+      currentTotalLength += embed.description.length;
+    }
+    if (currentBatch.length > 0) messages.push(currentBatch);
+
+    // Send the first batch as @original PATCH
+    await fetch(`${followUpUrl}/messages/@original`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: messages[0] })
+    });
+
+    // Send remaining batches as separate follow-up POSTs
+    for (let i = 1; i < messages.length; i++) {
+      await fetch(followUpUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ embeds: messages[i] })
+      });
+    }
+
+  } catch (err) {
+    console.error(err);
+    await fetch(`${followUpUrl}/messages/@original`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: `Error: ${err.message}` })
     });
   }
-  return new Response(JSON.stringify({
-    type: 4,
-    data: {
-      embeds: [{
-        title: story.title,
-        author: { name: story.author },
-        description: story.content,
-        footer: { text: `ID: ${story.id}` }
-      }],
-      flags: 64
-    }
-  }), { headers: { 'content-type': 'application/json' } });
 }
 
 async function handleListenStory(interaction, storyId, env) {
   const followUpUrl = `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`;
 
   try {
-    // 1. Fetch Story
     const story = await env.DB.prepare('SELECT * FROM stories WHERE id = ?').bind(storyId).first();
     if (!story) {
       await fetch(followUpUrl, {
@@ -198,7 +262,6 @@ async function handleListenStory(interaction, storyId, env) {
       return;
     }
 
-    // 2. Clean Text
     const cleanContent = story.content
       .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Z}\p{Sm}\p{Sc}\s]/gu, '')
       .replace(/\s+/g, ' ')
@@ -208,15 +271,15 @@ async function handleListenStory(interaction, storyId, env) {
       await fetch(followUpUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'The story content is empty after cleaning.' })
+        body: JSON.stringify({ content: 'Nothing to narrate after cleaning.' })
       });
       return;
     }
 
-    // 3. High-Speed Unlimited TTS (StreamElements API)
-    // Matthew is a clear, male storytelling voice.
+    // 1000 character chunks to stay within subrequest limits (max 50)
+    // for 50,000 char stories.
     const chunks = [];
-    const maxChunkSize = 250; // StreamElements works best with small chunks
+    const maxChunkSize = 1000;
     let remaining = cleanContent;
 
     while (remaining.length > 0) {
@@ -230,9 +293,8 @@ async function handleListenStory(interaction, storyId, env) {
       remaining = remaining.substring(index).trim();
     }
 
-    // Parallelize for maximum speed
     const audioPromises = chunks.map(chunk =>
-      fetch(`https://api.streamelements.com/static/saas/proxy/tts?voice=Matthew&text=${encodeURIComponent(chunk)}`)
+      fetch(`https://api.streamelements.com/kappa/v2/speech?voice=Matthew&text=${encodeURIComponent(chunk)}`)
         .then(res => {
           if (!res.ok) throw new Error(`TTS Error: ${res.status}`);
           return res.arrayBuffer();
@@ -249,10 +311,9 @@ async function handleListenStory(interaction, storyId, env) {
       offset += part.length;
     }
 
-    // 4. Follow-up
     const formData = new FormData();
     formData.append('payload_json', JSON.stringify({
-      content: `Here is your audio for **${story.title}** by ${story.author}:`
+      content: `Audio for **${story.title}**:`
     }));
     formData.append('files[0]', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/[^\w.-]/g, '_')}.mp3`);
 
@@ -260,13 +321,11 @@ async function handleListenStory(interaction, storyId, env) {
 
   } catch (err) {
     console.error(err);
-    try {
-      await fetch(followUpUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: `Failed to generate audio: ${err.message}` })
-      });
-    } catch (e) {}
+    await fetch(followUpUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: `TTS Failed: ${err.message}` })
+    });
   }
 }
 
