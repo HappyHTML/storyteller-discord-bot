@@ -198,7 +198,7 @@ async function handleListenStory(interaction, storyId, env) {
       return;
     }
 
-    // 2. Clean Text (Rid all emoticons, keep punctuation, math, currency)
+    // 2. Clean Text
     const cleanContent = story.content
       .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Z}\p{Sm}\p{Sc}\s]/gu, '')
       .replace(/\s+/g, ' ')
@@ -208,63 +208,39 @@ async function handleListenStory(interaction, storyId, env) {
       await fetch(followUpUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'The story content is empty or contains only emoticons, so there is nothing to narrate!' })
+        body: JSON.stringify({ content: 'The story content is empty after cleaning.' })
       });
       return;
     }
 
-    if (cleanContent.length > 20000) {
-       await fetch(followUpUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'This story is exceptionally long (over 20,000 characters)! Please use the Read button instead.' })
-      });
-      return;
-    }
-
-    // 3. Generate Audio (Chunked to handle limits)
-    if (!env.AI) {
-      throw new Error("AI binding not found. Ensure '[ai] binding = \"AI\"' is in wrangler.toml and deployed.");
-    }
-
+    // 3. High-Speed Unlimited TTS (StreamElements API)
+    // Matthew is a clear, male storytelling voice.
     const chunks = [];
-    const chunkSize = 1900; // Aim for 1900 chars
+    const maxChunkSize = 250; // StreamElements works best with small chunks
     let remaining = cleanContent;
 
     while (remaining.length > 0) {
-      if (remaining.length <= chunkSize) {
+      if (remaining.length <= maxChunkSize) {
         chunks.push(remaining);
         break;
       }
-
-      // Find the last space within the chunk size
-      let index = remaining.lastIndexOf(' ', chunkSize);
-      if (index === -1) index = chunkSize; // No space found, fallback to hard cut
-
+      let index = remaining.lastIndexOf(' ', maxChunkSize);
+      if (index === -1) index = maxChunkSize;
       chunks.push(remaining.substring(0, index).trim());
       remaining = remaining.substring(index).trim();
     }
 
+    // Parallelize for maximum speed
     const audioPromises = chunks.map(chunk =>
-      env.AI.run('@cf/deepgram/aura-2-en', {
-        text: chunk,
-        speaker: 'orion',
-        encoding: 'mp3'
-      }, {
-        returnRawResponse: true
-      }).then(async res => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`AI Service Error: ${res.status} - ${errorText}`);
-        }
-        return res.arrayBuffer();
-      })
+      fetch(`https://api.streamelements.com/static/saas/proxy/tts?voice=Matthew&text=${encodeURIComponent(chunk)}`)
+        .then(res => {
+          if (!res.ok) throw new Error(`TTS Error: ${res.status}`);
+          return res.arrayBuffer();
+        })
     );
 
     const audioBuffers = await Promise.all(audioPromises);
     const audioParts = audioBuffers.map(part => new Uint8Array(part));
-
-    // Concatenate all audio parts
     const totalLength = audioParts.reduce((acc, val) => acc + val.length, 0);
     const audioBuffer = new Uint8Array(totalLength);
     let offset = 0;
@@ -273,23 +249,14 @@ async function handleListenStory(interaction, storyId, env) {
       offset += part.length;
     }
 
-    // 4. Send as Follow-up with FormData (PATCH original message)
+    // 4. Follow-up
     const formData = new FormData();
     formData.append('payload_json', JSON.stringify({
       content: `Here is your audio for **${story.title}** by ${story.author}:`
     }));
-    // Use files[0] for attachment name in payload if needed, but Discord usually picks it up from the field name or filename
     formData.append('files[0]', new Blob([audioBuffer], { type: 'audio/mpeg' }), `${story.title.replace(/[^\w.-]/g, '_')}.mp3`);
 
-    const res = await fetch(followUpUrl, {
-      method: 'PATCH',
-      body: formData
-    });
-
-    if (!res.ok) {
-        const text = await res.text();
-        console.error('Discord PATCH error:', text);
-    }
+    await fetch(followUpUrl, { method: 'PATCH', body: formData });
 
   } catch (err) {
     console.error(err);

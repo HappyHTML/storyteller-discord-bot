@@ -32,16 +32,14 @@ export async function onRequestPost(context) {
     }
 
     // 1. Insert into D1 and ensure no gaps
+    // We order by original ID to maintain the existing sequence during re-index
     console.log('Re-indexing and inserting into D1...');
     await env.DB.batch([
-      // Re-index existing to close any gaps
-      env.DB.prepare('UPDATE stories SET id = id + 1000000'),
-      env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM stories s2 WHERE s2.id <= stories.id)'),
-      // Insert new story
+      // First, insert the new story (it will get the next AUTOINCREMENT ID temporarily)
       env.DB.prepare('INSERT INTO stories (title, author, content) VALUES (?, ?, ?)').bind(title, author, content),
-      // Final re-index to ensure the new one is also correctly numbered and seq is reset
+      // Now re-index ALL stories to close any gaps and ensure 1..N
       env.DB.prepare('UPDATE stories SET id = id + 1000000'),
-      env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM stories s2 WHERE s2.id <= stories.id)'),
+      env.DB.prepare('UPDATE stories SET id = (SELECT COUNT(*) FROM (SELECT id FROM stories ORDER BY id ASC) AS s2 WHERE s2.id <= stories.id)'),
       env.DB.prepare("UPDATE sqlite_sequence SET seq = (SELECT COUNT(*) FROM stories) WHERE name = 'stories'")
     ]);
     console.log('Insert and re-index successful');
