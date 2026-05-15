@@ -12,9 +12,14 @@ if (!appId || !token) {
 const commands = [
   {
     name: 'setup-catalog',
-    description: 'Initializes the story catalog embed in the current channel',
+    description: 'Initializes the persistent story catalog embed in the current channel',
     type: 1, // CHAT_INPUT
     default_member_permissions: "8" // Administrator
+  },
+  {
+    name: 'catalog',
+    description: 'View the story catalog',
+    type: 1,
   },
 ];
 

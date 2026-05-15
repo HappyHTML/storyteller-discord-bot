@@ -1,13 +1,10 @@
-name = "discord-bot"
-main = "src/index.js"
 compatibility_date = "2024-01-01"
+
+[vars]
+# DISCORD_TOKEN = ""
+# ADMIN_PASSWORD = ""
 
 [[d1_databases]]
 binding = "DB"
 database_name = "stories-db"
 database_id = "REPLACE_WITH_YOUR_DB_ID"
-
-[vars]
-# DISCORD_PUBLIC_KEY = ""
-# DISCORD_TOKEN = ""
-# DISCORD_APPLICATION_ID = ""

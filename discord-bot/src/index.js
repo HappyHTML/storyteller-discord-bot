@@ -6,9 +6,19 @@ import {
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
     try {
+      if (request.method === 'GET') {
+        return new Response('Storyteller Discord Bot is online.', { status: 200 });
+      }
+
       if (request.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405 });
+      }
+
+      // Support both root and /interactions path
+      if (url.pathname !== '/' && url.pathname !== '/interactions') {
+        return new Response('Not Found', { status: 404 });
       }
 
       const signature = request.headers.get('x-signature-ed25519');
@@ -41,6 +51,13 @@ export default {
       if (interaction.type === 2) { // APPLICATION_COMMAND
         if (interaction.data.name === 'setup-catalog') {
           return await handleSetupCatalog(interaction, env);
+        }
+        if (interaction.data.name === 'catalog') {
+          const { embed, components } = await createCatalogPage(1, env);
+          return new Response(JSON.stringify({
+            type: 4,
+            data: { embeds: [embed], components: components }
+          }), { headers: { 'content-type': 'application/json' } });
         }
       }
 
@@ -274,7 +291,7 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     const chunks = [];
-    const maxChunkSize = 1000;
+    const maxChunkSize = 200; // Google TTS limit is 200 chars
     let remaining = cleanContent;
 
     while (remaining.length > 0) {
