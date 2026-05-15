@@ -291,7 +291,7 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     const chunks = [];
-    const maxChunkSize = 1000; // Google API limit for long text
+    const maxChunkSize = 200; // Reduced to 200 to avoid 400 errors from Google API
     let remaining = cleanContent;
 
     while (remaining.length > 0) {
