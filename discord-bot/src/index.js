@@ -291,7 +291,7 @@ async function handleListenStory(interaction, storyId, env) {
     }
 
     const chunks = [];
-    const maxChunkSize = 200; // Google TTS limit is 200 chars
+    const maxChunkSize = 1000; // Google API limit for long text
     let remaining = cleanContent;
 
     while (remaining.length > 0) {
@@ -305,11 +305,21 @@ async function handleListenStory(interaction, storyId, env) {
       remaining = remaining.substring(index).trim();
     }
 
-    // Using the StreamElements direct proxy for best reliability and avoiding 401s
-    const audioPromises = chunks.map(chunk =>
-      fetch(`https://api.streamelements.com/static/saas/proxy/tts?voice=Matthew&text=${encodeURIComponent(chunk)}`)
-        .then(res => {
-          if (!res.ok) throw new Error(`TTS Error: ${res.status}`);
+    // Using the more stable translate.googleapis.com endpoint
+    // Filter out any accidentally empty chunks
+    const validChunks = chunks.filter(c => c.length > 0);
+
+    const audioPromises = validChunks.map(chunk =>
+      fetch(`https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=en&client=gtx`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
+      })
+        .then(async res => {
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`TTS Error ${res.status}: ${errText.substring(0, 100)}`);
+          }
           return res.arrayBuffer();
         })
     );
